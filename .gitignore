@@ -3,4 +3,8 @@
 kdev4
 .idea
 cmake-build*
+build*
 coverage*
+.envrc
+flake.*
+.direnv/*
