@@ -10,7 +10,14 @@
 
 #include "channelflow/config.h"
 
+#ifdef _WIN32
+// Windows-specific includes
+#include <winsock2.h> // Replaces arpa/inet.h for htonl, ntohl, etc.
+#endif
+#else
+// Standard POSIX includes (Linux, macOS, etc.)
 #include <arpa/inet.h>
+#endif
 
 #include <cassert>
 #include <cmath>
@@ -71,7 +78,7 @@ static const int MPI_COMM_WORLD = 0;
 #endif
 
 // forward declaration
-void cferror(const std::string& message);
+void cferror(const std::string &message);
 // typedef unsigned int uint;
 
 enum fieldstate { Physical, Spectral };
@@ -89,37 +96,38 @@ inline int cube(int x);
 inline Real square(Real x);
 inline Real cube(Real x);
 inline Real nr_sign(Real a, Real b);
-inline void swap(int& a, int& b);
-inline void swap(Real& a, Real& b);
-inline void swap(Complex& a, Complex& b);
+inline void swap(int &a, int &b);
+inline void swap(Real &a, Real &b);
+inline void swap(Complex &a, Complex &b);
 
 inline int Greater(int a, int b);
 inline int lesser(int a, int b);
 inline Real Greater(Real a, Real b);
 inline Real lesser(Real a, Real b);
 
-inline int iround(Real x);        // round to closest int
-inline int intpow(int n, int p);  // named this way to avoid real,int -> int,int casting
+inline int iround(Real x); // round to closest int
+inline int intpow(int n,
+                  int p); // named this way to avoid real,int -> int,int casting
 // Real pow(Real n, int p);
 // Real pow(Real n, Real p);
 
 // Real fmod(Real x, Real m);   // return y s.t. 0<=y<m & y+N*m==x
-inline Real pythag(Real a, Real b);  // sqrt(a^2 + b^2) avoiding over/underflow
+inline Real pythag(Real a, Real b); // sqrt(a^2 + b^2) avoiding over/underflow
 inline Real spythag(Real Lx, Real Lxtarg, Real Lz, Real Lztarg, Real phi);
 inline bool isPowerOfTwo(int n);
 
-inline Real Re(const Complex& z);  // Real part
-inline Real Im(const Complex& z);  // Imag part
+inline Real Re(const Complex &z); // Real part
+inline Real Im(const Complex &z); // Imag part
 // inline Real abs(const Complex& z);// sqrt(a^2 + b^2), provided by std lib
-inline Real abs2(const Complex& z);  // a^2 + b^2 for a + b i
+inline Real abs2(const Complex &z); // a^2 + b^2 for a + b i
 
-inline Real randomReal(Real a = 0, Real b = 1);  // uniform in [a, b]
-inline Complex randomComplex();                  // gaussian about zero
+inline Real randomReal(Real a = 0, Real b = 1); // uniform in [a, b]
+inline Complex randomComplex();                 // gaussian about zero
 
-inline std::ostream& operator<<(std::ostream& os, Complex z);
+inline std::ostream &operator<<(std::ostream &os, Complex z);
 
-inline std::ostream& operator<<(std::ostream& os, fieldstate f);
-inline std::istream& operator>>(std::istream& is, fieldstate& f);
+inline std::ostream &operator<<(std::ostream &os, fieldstate f);
+inline std::istream &operator>>(std::istream &is, fieldstate &f);
 
 inline int kronecker(int m, int n) { return (m == n) ? 1 : 0; }
 
@@ -130,20 +138,20 @@ inline Real nr_sign(Real a, Real b) { return (b >= 0.0) ? fabs(a) : -fabs(a); }
 
 inline int square(int x) { return x * x; }
 inline int cube(int x) { return x * x * x; }
-inline void swap(int& a, int& b) {
-    int tmp = a;
-    a = b;
-    b = tmp;
+inline void swap(int &a, int &b) {
+  int tmp = a;
+  a = b;
+  b = tmp;
 }
-inline void swap(Real& a, Real& b) {
-    Real tmp = a;
-    a = b;
-    b = tmp;
+inline void swap(Real &a, Real &b) {
+  Real tmp = a;
+  a = b;
+  b = tmp;
 }
-inline void swap(Complex& a, Complex& b) {
-    Complex tmp = a;
-    a = b;
-    b = tmp;
+inline void swap(Complex &a, Complex &b) {
+  Complex tmp = a;
+  a = b;
+  b = tmp;
 }
 
 // Inline replacements for >? and <? GNUisms.
@@ -151,49 +159,49 @@ inline int Greater(int a, int b) { return (a > b) ? a : b; }
 inline int lesser(int a, int b) { return (a < b) ? a : b; }
 inline Real Greater(Real a, Real b) { return (a > b) ? a : b; }
 inline Real lesser(Real a, Real b) { return (a < b) ? a : b; }
-inline Real Re(const Complex& z) { return z.real(); }
-inline Real Im(const Complex& z) { return z.imag(); }
-inline Real abs2(const Complex& z) {
-    return norm(z);  // NOTE std lib norm is misnamed! Returns a^2+b^2 for a+bi.
+inline Real Re(const Complex &z) { return z.real(); }
+inline Real Im(const Complex &z) { return z.imag(); }
+inline Real abs2(const Complex &z) {
+  return norm(z); // NOTE std lib norm is misnamed! Returns a^2+b^2 for a+bi.
 }
 
 inline Real pythag(Real a, Real b) {
-    Real absa = fabs(a);
-    Real absb = fabs(b);
+  Real absa = fabs(a);
+  Real absb = fabs(b);
 
-    if (absa > absb)
-        return absa * (sqrt(1.0 + square(absb / absa)));
-    else if (absb > absa)
-        return absb * (sqrt(1.0 + square(absa / absb)));
-    else
-        return 0.0;
+  if (absa > absb)
+    return absa * (sqrt(1.0 + square(absb / absa)));
+  else if (absb > absa)
+    return absb * (sqrt(1.0 + square(absa / absb)));
+  else
+    return 0.0;
 }
 
 // distance with a sign
 inline Real spythag(Real Lx, Real Lxtarg, Real Lz, Real Lztarg, Real phi) {
-    Real ex = cos(phi);
-    Real ez = sin(phi);
-    Real dLx = Lxtarg - Lx;
-    Real dLz = Lztarg - Lz;
-    Real dist = pythag(dLx, dLz);
-    Real projection = ex * dLx + ez * dLz;
-    int sign = 0;
-    if (projection > 0)
-        sign = 1;
-    else if (projection < 0)
-        sign = -1;
-    return sign * dist;
+  Real ex = cos(phi);
+  Real ez = sin(phi);
+  Real dLx = Lxtarg - Lx;
+  Real dLz = Lztarg - Lz;
+  Real dist = pythag(dLx, dLz);
+  Real projection = ex * dLx + ez * dLz;
+  int sign = 0;
+  if (projection > 0)
+    sign = 1;
+  else if (projection < 0)
+    sign = -1;
+  return sign * dist;
 }
 
 inline bool isPowerOfTwo(int N) {
-    int onbits = 0;
-    for (unsigned int i = 0; i < int(8 * sizeof(int)); ++i) {
-        onbits += N % 2;
-        N = N >> 1;
-        if (onbits > 1)
-            return false;
-    }
-    return true;
+  int onbits = 0;
+  for (unsigned int i = 0; i < int(8 * sizeof(int)); ++i) {
+    onbits += N % 2;
+    N = N >> 1;
+    if (onbits > 1)
+      return false;
+  }
+  return true;
 }
 
 // int roundReal(Real x) {
@@ -208,37 +216,38 @@ inline bool isPowerOfTwo(int N) {
 inline int iround(Real x) { return int(x > 0.0 ? x + 0.5 : x - 0.5); }
 
 inline int intpow(int x, int n) {
-    if (n < 0)
-        cferror("int pow(int, int) : can't do negative exponents, use Real pow(Real,int)");
-    switch (n) {
-        case 0:
-            return 1;
-        case 1:
-            return x;
-        case 2:
-            return x * x;
-        case 3:
-            return x * x * x;
-        case 4: {
-            int xx = x * x;
-            return xx * xx;
-        }
-        default: {
-            // a*x^n is invariant and n is decreasing in this loop
-            int a = 1;
-            while (n > 0) {
-                if (n % 2 == 0) {
-                    x *= x;  //     x -> x^2
-                    n /= 2;  //     n -> n/2
-                }            // a x^n -> a (x^2)^(n/2) = a x^n
-                else {
-                    a *= x;  //     a -> ax
-                    --n;     //     n -> n-1
-                }            // a x^n -> (a x) x^(n-1) = a x^n
-            }
-            return a;
-        }
+  if (n < 0)
+    cferror("int pow(int, int) : can't do negative exponents, use Real "
+            "pow(Real,int)");
+  switch (n) {
+  case 0:
+    return 1;
+  case 1:
+    return x;
+  case 2:
+    return x * x;
+  case 3:
+    return x * x * x;
+  case 4: {
+    int xx = x * x;
+    return xx * xx;
+  }
+  default: {
+    // a*x^n is invariant and n is decreasing in this loop
+    int a = 1;
+    while (n > 0) {
+      if (n % 2 == 0) {
+        x *= x; //     x -> x^2
+        n /= 2; //     n -> n/2
+      } // a x^n -> a (x^2)^(n/2) = a x^n
+      else {
+        a *= x; //     a -> ax
+        --n;    //     n -> n-1
+      } // a x^n -> (a x) x^(n-1) = a x^n
     }
+    return a;
+  }
+  }
 }
 
 /*****************************
@@ -266,57 +275,57 @@ Real fmod(Real x, Real modulus) {
 
 inline Real randomReal(Real a, Real b) {
 #ifdef HAVE_MPI
-    int taskid = 0;
-    int initialized = 0;
-    MPI_Initialized(&initialized);
-    if (initialized)
-        MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
-    srand48((long int)(taskid + 1) * 1000 * drand48());
-    return a + (b - a) * drand48();
+  int taskid = 0;
+  int initialized = 0;
+  MPI_Initialized(&initialized);
+  if (initialized)
+    MPI_Comm_rank(MPI_COMM_WORLD, &taskid);
+  srand48((long int)(taskid + 1) * 1000 * drand48());
+  return a + (b - a) * drand48();
 #else
-    return a + (b - a) * drand48();
+  return a + (b - a) * drand48();
 #endif
 }
 
 inline Complex randomComplex() {
-    Real a;
-    Real b;
-    Real r2;
-    do {
-        a = randomReal(-1, 1);
-        b = randomReal(-1, 1);
-        r2 = a * a + b * b;
-    } while (r2 >= 1.0 || r2 == 0.0);
-    return sqrt(-log(r2) / r2) * Complex(a, b);
+  Real a;
+  Real b;
+  Real r2;
+  do {
+    a = randomReal(-1, 1);
+    b = randomReal(-1, 1);
+    r2 = a * a + b * b;
+  } while (r2 >= 1.0 || r2 == 0.0);
+  return sqrt(-log(r2) / r2) * Complex(a, b);
 }
 
-inline std::ostream& operator<<(std::ostream& os, Complex z) {
-    os << '(' << Re(z) << ", " << Im(z) << ')';
-    return os;
+inline std::ostream &operator<<(std::ostream &os, Complex z) {
+  os << '(' << Re(z) << ", " << Im(z) << ')';
+  return os;
 }
 
-inline std::ostream& operator<<(std::ostream& os, fieldstate s) {
-    os << ((s == Spectral) ? 'S' : 'P');
-    return os;
+inline std::ostream &operator<<(std::ostream &os, fieldstate s) {
+  os << ((s == Spectral) ? 'S' : 'P');
+  return os;
 }
 
-inline std::istream& operator>>(std::istream& is, fieldstate& s) {
-    char c = ' ';
-    while (c == ' ')
-        is >> c;
-    switch (c) {
-        case 'P':
-            s = Physical;
-            break;
-        case 'S':
-            s = Spectral;
-            break;
-        default:
-            std::cerr << "read fieldstate error: unknown fieldstate " << c << std::endl;
-            s = Spectral;
-            assert(false);
-    }
-    return is;
+inline std::istream &operator>>(std::istream &is, fieldstate &s) {
+  char c = ' ';
+  while (c == ' ')
+    is >> c;
+  switch (c) {
+  case 'P':
+    s = Physical;
+    break;
+  case 'S':
+    s = Spectral;
+    break;
+  default:
+    std::cerr << "read fieldstate error: unknown fieldstate " << c << std::endl;
+    s = Spectral;
+    assert(false);
+  }
+  return is;
 }
 
 // inline Complex conjugate(const Complex& z) {
@@ -331,10 +340,10 @@ inline std::istream& operator>>(std::istream& is, fieldstate& s) {
 // inline Real norm2(const Complex& z) {
 //  return square(Re(z)) + square(Im(z));
 //}
-//#ifdef WIN32
-//#undef assert
-//#define assert(expr) (if(!expr) {cout << "Assertion failed. "<<endl; abort();})
-//#endif
+// #ifdef WIN32
+// #undef assert
+// #define assert(expr) (if(!expr) {cout << "Assertion failed. "<<endl;
+// abort();}) #endif
 
-}  // namespace chflow
+} // namespace chflow
 #endif /* MATHDEFS_H */
